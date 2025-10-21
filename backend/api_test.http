@@ -1,0 +1,13 @@
+
+### Register a new patient
+POST http://127.0.0.1:5000/register
+Content-Type: application/json
+
+{
+  "name": "Sanjana ",
+  "email": "sanjana1@example.com",
+  "password": "MySecurePasswordme123",
+  "role": "patient",
+  "wallet_address": "0x1234567892abcdef"
+}
+
