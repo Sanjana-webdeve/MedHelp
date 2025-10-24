@@ -140,6 +140,32 @@ def upload_to_ipfs(filepath):
     return res['Hash']
 
 # ---------------- Routes ----------------
+@app.route('/api/pendingDoctors', methods=['GET'])
+def get_pending():
+    cursor.execute("SELECT id, name, email, specialization FROM pending_doctors")
+    rows = cursor.fetchall()
+    return jsonify([{"id": r[0], "name": r[1], "email": r[2], "specialization": r[3]} for r in rows])
+
+@app.route('/api/approveDoctor', methods=['POST'])
+def approve_doctor():
+    doctor_id = request.json['id']
+    cursor.execute("""
+        INSERT INTO doctors (name, email, specialization)
+        SELECT name, email, specialization FROM pending_doctors WHERE id = %s
+    """, (doctor_id,))
+    cursor.execute("DELETE FROM pending_doctors WHERE id = %s", (doctor_id,))
+    conn.commit()
+    return jsonify({"message": "Doctor approved successfully"})
+
+@app.route('/api/rejectDoctor', methods=['POST'])
+def reject_doctor():
+    doctor_id = request.json['id']
+    cursor.execute("DELETE FROM pending_doctors WHERE id = %s", (doctor_id,))
+    conn.commit()
+    return jsonify({"message": "Doctor rejected"})
+
+if __name__ == '__main__':
+    app.run(debug=True)
 @app.route('/')
 def home():
     return jsonify({"message": "MedHelp API running!"})
