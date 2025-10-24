@@ -12,7 +12,7 @@ from flask_migrate import Migrate
 from flask_bcrypt import Bcrypt
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, verify_jwt_in_request, get_jwt_identity, get_jwt
-from flask_mail import Mail
+from flask_mail import Mail,Message
 from dotenv import load_dotenv
 from web3 import Web3
 import ipfshttpclient
@@ -269,6 +269,56 @@ def admin_dashboard():
     pending_count = DoctorApplicant.query.filter_by(status='pending').count()
     approved_count = Doctor.query.count()
     return jsonify({"pending_doctors": pending_count, "approved_doctors": approved_count}), 200
+@app.route('/send_invite', methods=['POST'])
+def send_invite():
+    try:
+        data = request.get_json()
+        doctor_id = data.get("doctor_id")
+        patient_id = data.get("patient_id")
+        meeting_link = data.get("meeting_link")
+
+        if not all([doctor_id, patient_id, meeting_link]):
+            return jsonify({"error": "Missing data"}), 400
+
+        # Fetch doctor and patient from DB
+        doctor = Doctor.query.get(doctor_id)
+        patient = Patient.query.get(patient_id)
+
+        if not doctor or not patient:
+            return jsonify({"error": "Doctor or patient not found"}), 404
+
+        # Optional: Update appointment status
+        appointment = Appointment.query.filter_by(doc_id=doctor_id, p_id=patient_id).first()
+        if appointment:
+            appointment.status = "active"
+            db.session.commit()
+
+        # Send email invite
+        msg = Message(
+            subject=f"Meeting Invitation from Dr. {doctor.name}",
+            recipients=[patient.email],
+            body=f"""
+Hello {patient.name},
+
+Dr. {doctor.name} has started your consultation session.
+
+You can join the meeting using this link:
+{meeting_link}
+
+Date: {datetime.now().strftime('%Y-%m-%d')}
+Time: {datetime.now().strftime('%I:%M %p')}
+
+Thank you,
+Team MedHelp
+"""
+        )
+
+        mail.send(msg)
+        return jsonify({"message": f"Invite sent to {patient.email} successfully!"}), 200
+
+    except Exception as e:
+        print("Error:", e)
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/admin/approve_doctor/<int:appl_id>', methods=['POST'])
 @admin_required
@@ -364,4 +414,6 @@ if __name__ == "__main__":
     with app.app_context():
         db.create_all()
     app.run(debug=True)
+
+
 
